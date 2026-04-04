@@ -1,0 +1,16 @@
+add_executable(test_chunked_deque test_chunked_deque.cpp)
+
+target_link_libraries(test_chunked_deque PRIVATE logana_core)
+
+if(SANITIZER STREQUAL "asan")
+    target_compile_options(test_chunked_deque PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(test_chunked_deque PRIVATE -fsanitize=address)
+elseif(SANITIZER STREQUAL "tsan")
+    target_compile_options(test_chunked_deque PRIVATE -fsanitize=thread)
+    target_link_options(test_chunked_deque PRIVATE -fsanitize=thread)
+elseif(SANITIZER STREQUAL "ubsan")
+    target_compile_options(test_chunked_deque PRIVATE -fsanitize=undefined)
+    target_link_options(test_chunked_deque PRIVATE -fsanitize=undefined)
+endif()
+
+add_test(NAME ChunkedDequeTests COMMAND test_chunked_deque)
