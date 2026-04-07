@@ -8,7 +8,8 @@ if [ "$SANITIZER" != "none" ]; then
     BUILD_DIR="build-${SANITIZER}"
 fi
 
-./scripts/build.sh "$SANITIZER"
+cmake -B "$BUILD_DIR" -DSANITIZER="$SANITIZER" -DCMAKE_BUILD_TYPE=Debug
+cmake --build "$BUILD_DIR" -j$(nproc)
 
 echo ""
 echo "Running tests (sanitizer: $SANITIZER)..."
