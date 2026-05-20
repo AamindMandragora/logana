@@ -20,12 +20,12 @@ void test_create_tag() {
     std::cout << "test_create_tag passed" << std::endl;
 }
 
-// tests adding an account to the tag
+// tests adding a connected account to the tag
 void test_add_member() {
     TagRegistry registry;
-    // account 100 creates tag 1
+    // account 100 connects to 200, creates tag 1, and adds 200
+    registry.add_connection(100, 200);
     registry.create_tag(1, 100);
-    // account 100 adds account 200 to tag 1
     assert(registry.add_member(1, 100, 200));
 
     // gets the members of tag 1, asserts both 100 and 200 are members
@@ -40,7 +40,8 @@ void test_add_member() {
 // tests double-add
 void test_add_member_already_exists() {
     TagRegistry registry;
-    // account 100 creates tag 1
+    // account 100 connects to 200, creates tag 1
+    registry.add_connection(100, 200);
     registry.create_tag(1, 100);
     // account 100 tries to add account 200 to tag 1 twice, assert success first time and fail second time
     assert(registry.add_member(1, 100, 200));
@@ -49,14 +50,19 @@ void test_add_member_already_exists() {
     std::cout << "test_add_member_already_exists passed" << std::endl;
 }
 
-// tests member with no permissions attempting to add someone else
+// tests member with no permissions attempting to add someone they're connected to
 void test_add_member_denied_no_permission() {
     TagRegistry registry;
+    // account 100 connects to 200, 200 connects to 300
+    registry.add_connection(100, 200);
+    registry.add_connection(200, 300);
     // account 100 creates tag 1 and adds account 200
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
+    // 100 and 200 disconnect
+    registry.remove_connection(100, 200);
 
-    // account 200 fails to add account 300 as it has no permissions
+    // account 200 fails to add account 300 as it doesn't have permissions anymore
     assert(!registry.add_member(1, 200, 300));
 
     // gets the members of tag 1 and asserts there are 2
@@ -66,15 +72,33 @@ void test_add_member_denied_no_permission() {
     std::cout << "test_add_member_denied_no_permission passed" << std::endl;
 }
 
+// tests adding a member who isn't connected to the inviter
+void test_add_member_denied_no_connection() {
+    TagRegistry registry;
+    // account 100 creates tag 1
+    registry.create_tag(1, 100);
+
+    // account 100 fails to add account 200 as no connection
+    assert(!registry.add_member(1, 100, 200));
+
+    auto members = registry.get_members(1);
+    assert(members.size() == 1);
+
+    std::cout << "test_add_member_denied_no_connection passed" << std::endl;
+}
+
 // test setting the inviter permission for a member and having that member invite another member
 void test_add_member_with_inviter_flag() {
     TagRegistry registry;
-    // account 100 creates tag 1 and invites 200 as an inviter
+    // account 100 connects to 200, 200 connects to 300
+    registry.add_connection(100, 200);
+    registry.add_connection(200, 300);
+    // account 100 creates tag 1, adds 200, and gives 200 inviter permission
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
     registry.set_permissions(1, 100, 200, FLAG_INVITER);
 
-    // assert 200 can add 300 to the tag since they have the permissions
+    // assert 200 can add 300 to the tag since they have the permissions and are connected
     assert(registry.add_member(1, 200, 300));
 
     // asserts there are three members in the tag
@@ -87,7 +111,8 @@ void test_add_member_with_inviter_flag() {
 // tests removing a member from the tag
 void test_remove_member() {
     TagRegistry registry;
-    // account 100 creates tag 1, adds account 200, and removes account 200
+    // account 100 connects to 200, creates tag 1, adds 200, and removes 200
+    registry.add_connection(100, 200);
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
     assert(registry.remove_member(1, 100, 200));
@@ -104,7 +129,9 @@ void test_remove_member() {
 // tests account without permissions tries to remove a member
 void test_remove_member_denied_no_permission() {
     TagRegistry registry;
-    // account 100 creates tag 1, adds accounts 200 and 300
+    // account 100 connects to 200 and 300, creates tag 1, adds 200 and 300
+    registry.add_connection(100, 200);
+    registry.add_connection(100, 300);
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
     registry.add_member(1, 100, 300);
@@ -122,7 +149,9 @@ void test_remove_member_denied_no_permission() {
 // tests account with kicker flag removing another member
 void test_remove_member_with_kicker_flag() {
     TagRegistry registry;
-    // account 100 creates tag 1, adds 200 and 300
+    // account 100 connects to 200 and 300, creates tag 1, adds 200 and 300
+    registry.add_connection(100, 200);
+    registry.add_connection(100, 300);
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
     registry.add_member(1, 100, 300);
@@ -160,7 +189,8 @@ void test_remove_creator_denied() {
 // tests an account removing itself
 void test_self_leave() {
     TagRegistry registry;
-    // account 100 creates tag 1 and adds account 200
+    // account 100 connects to 200, creates tag 1 and adds account 200
+    registry.add_connection(100, 200);
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
 
@@ -217,12 +247,16 @@ void test_fully_connected_two_connected() {
     std::cout << "test_fully_connected_two_connected passed" << std::endl;
 }
 
-// tests the permissions of accounts that aren't connected
+// tests that disconnecting removes write permission
 void test_not_connected_no_write() {
     TagRegistry registry;
-    // 100 creates tag 1 and adds 200
+    // connects 100 and 200, 100 creates tag 1 and adds 200
+    registry.add_connection(100, 200);
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
+
+    // disconnects 100 and 200
+    registry.remove_connection(100, 200);
 
     // 100 can write as it's the creator, 200 cannot
     assert(registry.can_write(1, 100));
@@ -272,20 +306,24 @@ void test_three_members_full_connectivity() {
     std::cout << "test_three_members_full_connectivity passed" << std::endl;
 }
 
-// tests adding connection after being added to the tag
+// tests that disconnecting then reconnecting restores write permission
 void test_connection_added_after_tag() {
     TagRegistry registry;
-    // 100 creates tag 1, adds 200
+    // connects 100 and 200, 100 creates tag 1 and adds 200
+    registry.add_connection(100, 200);
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
 
-    // 200 initially can't write
+    // both can write while connected
+    assert(registry.can_write(1, 100));
+    assert(registry.can_write(1, 200));
+
+    // disconnects 100 and 200, 200 loses write
+    registry.remove_connection(100, 200);
     assert(!registry.can_write(1, 200));
 
-    // make 100 connected to 200, which is now fully connected
+    // reconnects 100 and 200, write restored
     registry.add_connection(100, 200);
-
-    // now both 100 and 200 can write
     assert(registry.can_write(1, 100));
     assert(registry.can_write(1, 200));
 
@@ -317,17 +355,18 @@ void test_connection_removed() {
 // tests removing an unconnected member, restoring connectivity to other members
 void test_remove_unconnected_member_restores_connectivity() {
     TagRegistry registry;
-    // 100 connects to 200, creates tag 1 and adds 200 and 300
+    // 100 connects to 200 and 300, creates tag 1 and adds 200 and 300
     registry.add_connection(100, 200);
+    registry.add_connection(100, 300);
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
     registry.add_member(1, 100, 300);
 
-    // 100 can write as is creator, 200 cannot
+    // 200 and 300 aren't connected to each other, so not fully connected
     assert(registry.can_write(1, 100));
     assert(!registry.can_write(1, 200));
 
-    // 100 removes 300, 200 now connected to everyone
+    // 100 removes 300, now only 100 and 200 remain and they are connected
     registry.remove_member(1, 100, 300);
 
     // both 100 and 200 can write now
@@ -346,7 +385,7 @@ void test_set_permissions_by_fully_connected() {
     // 100 creates tag 1, adds 200 and 300
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
-    registry.add_member(1, 100, 300);
+    registry.add_member(1, 200, 300);
 
     // 200 is fully connected and can set permissions
     registry.set_permissions(1, 200, 300, FLAG_WRITER);
@@ -360,12 +399,14 @@ void test_set_permissions_by_fully_connected() {
 // a non-fully connected member without the permission can't set the permissions of other members
 void test_set_permissions_denied_not_connected() {
     TagRegistry registry;
-    // 100 creates tag 1, adds 200 and 300
+    // 100 connects to 200 and 300, creates tag 1, adds 200 and 300
+    registry.add_connection(100, 200);
+    registry.add_connection(100, 300);
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
     registry.add_member(1, 100, 300);
 
-    // 200 attempts to give 300 the writer permission
+    // 200 and 300 aren't connected, so 200 is not fully connected and has no FLAG_MODIFIER
     registry.set_permissions(1, 200, 300, FLAG_WRITER);
 
     // 300 still can't write because 200 isn't allowed to do that
@@ -377,8 +418,9 @@ void test_set_permissions_denied_not_connected() {
 // tests having explicit permission to modify permissions
 void test_set_permissions_by_modifier() {
     TagRegistry registry;
-    // connects 100 and 200, 100 creates tag 1, adds 200 and 300
+    // connects 100 to 200 and 300, 100 creates tag 1, adds 200 and 300
     registry.add_connection(100, 200);
+    registry.add_connection(100, 300);
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
     registry.add_member(1, 100, 300);
@@ -416,6 +458,7 @@ void test_last_write_wins() {
     registry.add_connection(100, 300);
     registry.add_connection(200, 300);
     registry.add_connection(200, 400);
+    registry.add_connection(100, 400);
     // 100 creates tag 1, adds 200, 300, 400
     registry.create_tag(1, 100);
     registry.add_member(1, 100, 200);
@@ -433,21 +476,26 @@ void test_last_write_wins() {
     std::cout << "test_last_write_wins passed" << std::endl;
 }
 
-// tests accounts sharing multiple tags
+// tests accounts sharing multiple tags with a third member breaking full connectivity
 void test_multiple_shared_tags() {
     TagRegistry registry;
-    // 100 creates tags 1 and 2, invites 200 to both
+    // 100 connects to 200 and 300
+    registry.add_connection(100, 200);
+    registry.add_connection(100, 300);
+    // 100 creates tags 1 and 2, invites 200 and 300 to both
     registry.create_tag(1, 100);
     registry.create_tag(2, 100);
     registry.add_member(1, 100, 200);
+    registry.add_member(1, 100, 300);
     registry.add_member(2, 100, 200);
+    registry.add_member(2, 100, 300);
 
-    // 200 can't write in eithe tag
+    // 200 and 300 aren't connected to each other, so not fully connected in either tag
     assert(!registry.can_write(1, 200));
     assert(!registry.can_write(2, 200));
 
-    // 200 becomes fully connected
-    registry.add_connection(100, 200);
+    // connecting 200 and 300 makes both tags fully connected
+    registry.add_connection(200, 300);
 
     // 200 can write in both tags
     assert(registry.can_write(1, 200));
@@ -492,6 +540,7 @@ int main() {
     test_add_member();
     test_add_member_already_exists();
     test_add_member_denied_no_permission();
+    test_add_member_denied_no_connection();
     test_add_member_with_inviter_flag();
     test_remove_member();
     test_remove_member_denied_no_permission();

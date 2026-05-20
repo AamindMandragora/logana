@@ -43,8 +43,10 @@ ctest --test-dir build --output-on-failure
 logana/
 ├── core/                   # Engine library (header-only for now)
 │   └── include/logana/
-│       ├── types.hpp       # Message types, flags, headers
-│       └── chunked_deque.hpp   # Lock-free SPSC chunked deque
+│       ├── types.hpp           # Message types, flags, headers
+│       ├── chunked_deque.hpp   # Lock-free SPSC chunked deque
+│       ├── device_registry.hpp # Device tracking and fan-out
+│       └── tag_registry.hpp    # Tag membership and permissions
 ├── test/                   # Test suite
 ├── design/                 # Design documents per commit
 └── scripts/                # Build convenience scripts

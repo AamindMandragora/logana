@@ -13,14 +13,14 @@ namespace logana {
         // a constant-size array of messages
         Message messages_[size];
         // the smallest sequence stored in this chunk
-        uint64_t base_sequence_;
+        Sequence base_sequence_;
         // total number of messages appended to the chunk
         std::atomic<uint64_t> lifetime_count_{0};
         // the number of currently alive (non-tombstoned) messages
         uint64_t live_messages_{0};
     public:
         // the constructor that takes the base sequence
-        Chunk(uint64_t base) : base_sequence_(base) {}
+        Chunk(Sequence base) : base_sequence_(base) {}
 
         // checks if we've filled the array
         bool is_full() const {
@@ -41,7 +41,7 @@ namespace logana {
             live_messages_++;
         }
 
-        Message *get(uint64_t sequence) {
+        Message *get(Sequence sequence) {
             // checks if input sequence is within bounds
             if (get_base_sequence() <= sequence && sequence < get_end_sequence()) {
                 // calculates the relative index
@@ -53,7 +53,7 @@ namespace logana {
             return nullptr;
         }
 
-        void tombstone(uint64_t sequence) {
+        void tombstone(Sequence sequence) {
             // finds the message corresponding to sequence
             Message *message = get(sequence);
             // if none exists return early
@@ -70,12 +70,12 @@ namespace logana {
         }
 
         // getter for the base index
-        uint64_t get_base_sequence() const {
+        Sequence get_base_sequence() const {
             return base_sequence_;
         }
 
         // getter for the end sequence
-        uint64_t get_end_sequence() const {
+        Sequence get_end_sequence() const {
             return base_sequence_ + lifetime_count_.load(std::memory_order_acquire);
         }
     };
@@ -86,18 +86,18 @@ namespace logana {
         // dynamic vector holding unique pointers to chunks
         std::vector<std::unique_ptr<Chunk<size>>> chunks;
         // the index the next message will be assigned
-        std::atomic<uint64_t> next_sequence_{0};
+        std::atomic<Sequence> next_sequence_{0};
         // stores the oldest index in the deque
-        uint64_t oldest_sequence_{0};
+        Sequence oldest_sequence_{0};
     public:
         // constructor that reserves space in vector
         ChunkedDeque(size_t init_cap = 64) {
             chunks.reserve(init_cap);
         }
         // push rvalue message to queue, output must be used
-        [[nodiscard]] uint64_t push(Message&& message) {
+        [[nodiscard]] Sequence push(Message&& message) {
             // gets the index to be assigned
-            uint64_t next = get_next_sequence();
+            Sequence next = get_next_sequence();
             // need to make a new chunk if the last one doesn't exist or is full
             if (chunks.empty() || chunks.back()->is_full()) {
                 chunks.emplace_back(std::make_unique<Chunk<size>>(next));
@@ -110,7 +110,7 @@ namespace logana {
         }
 
         // returns the message associated with the sequence
-        Message *read(uint64_t sequence) {
+        Message *read(Sequence sequence) {
             // there has to be a chunk and the sequence has to be within bounds
             if (!chunks.empty() && chunks.front()->get_base_sequence() <= sequence && sequence < get_next_sequence()) {
                 // calculate relative index
@@ -123,7 +123,7 @@ namespace logana {
         }
 
         // tombstones the message associated with the sequence
-        void tombstone(uint64_t sequence) {
+        void tombstone(Sequence sequence) {
             // there has to be a chunk and the sequence has to be within bounds
             if (!chunks.empty() && chunks.front()->get_base_sequence() <= sequence && sequence < get_next_sequence()) {
                 // calculate relative index
@@ -134,13 +134,13 @@ namespace logana {
         }
 
         // gets a vector of count references to messages starting at sequence start
-        std::vector<MessageRef> read_range(uint64_t start, size_t count) {
+        std::vector<MessageRef> read_range(Sequence start, size_t count) {
             // initialize return vector
             std::vector<MessageRef> to_return;
             // can't exceed the to-be-assigned sequence
-            uint64_t next = get_next_sequence();
+            Sequence next = get_next_sequence();
             // loops while we're within bounds and have less than count messages
-            for (uint64_t i = start; i < next && to_return.size() < count; i++) {
+            for (Sequence i = start; i < next && to_return.size() < count; i++) {
                 // reads the message with sequence i
                 Message *m = read(i);
                 // if the message exists construct a reference and add to the vector
@@ -163,7 +163,7 @@ namespace logana {
         }
 
         // updates the oldest sequence and deletes all older messages
-        void update_oldest_sequence(uint64_t older) {
+        void update_oldest_sequence(Sequence older) {
             oldest_sequence_ = older;
             while (!chunks.empty() && chunks.front()->get_end_sequence() <= oldest_sequence_) {
                 chunks.erase(chunks.begin());
@@ -171,12 +171,12 @@ namespace logana {
         }
 
         // gets the to-be-assigned sequence
-        uint64_t get_next_sequence() const {
+        Sequence get_next_sequence() const {
             return next_sequence_.load(std::memory_order_acquire);
         }
 
         // gets the oldest sequence
-        uint64_t get_oldest_sequence() const {
+        Sequence get_oldest_sequence() const {
             if (chunks.empty()) return get_next_sequence();
             return chunks.front()->get_base_sequence();
         }

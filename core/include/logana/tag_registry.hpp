@@ -26,25 +26,25 @@ namespace logana {
     // struct holding tag information
     struct TagEntry {
         // unique id of the tag
-        uint32_t tag_id;
+        TagId tag_id;
         // unique account id of the tag's creator
-        uint32_t creator_id;
+        AccountId creator_id;
         // mapping between accounts inside the tag and their permissions
-        std::unordered_map<uint32_t, TagPermission> account_permissions;
+        std::unordered_map<AccountId, TagPermission> account_permissions;
     };
 
     // class holding the info about all of the tags
     class TagRegistry {
         std::mutex mutex_;
         // mapping from tag ids to tag entries
-        std::unordered_map<uint32_t, TagEntry> tags_;
+        std::unordered_map<TagId, TagEntry> tags_;
         // mapping between account ids and a set of tags they're in
-        std::unordered_map<uint32_t, std::unordered_set<uint32_t>> tags_of_account_;
+        std::unordered_map<AccountId, std::unordered_set<TagId>> tags_of_account_;
         // adjacency list for account ids and accounts they're connected to
-        std::unordered_map<uint32_t, std::unordered_set<uint32_t>> adjacent_accounts_;
+        std::unordered_map<AccountId, std::unordered_set<AccountId>> adjacent_accounts_;
 
         // helper function that recomputes the interconnectedness of every account in the tag
-        void recompute_connectivity(uint32_t tag_id) {
+        void recompute_connectivity(TagId tag_id) {
             // gets reference of all accounts in the tag
             auto& members = tags_[tag_id].account_permissions;
             for (auto& [id, perm] : members) {
@@ -64,7 +64,7 @@ namespace logana {
         }
     public:
         // account param creates tag with id param
-        void create_tag(uint32_t tag_id, uint32_t account_id) {
+        void create_tag(TagId tag_id, AccountId account_id) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // creates a new entry and fills out fields
@@ -80,13 +80,13 @@ namespace logana {
         }
 
         // setter account adds target account to the tag
-        bool add_member(uint32_t tag_id, uint32_t setter_id, uint32_t target_id) {
+        bool add_member(TagId tag_id, AccountId setter_id, AccountId target_id) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // checks if tag, setter, target exist
             if (!tags_.contains(tag_id) || !tags_[tag_id].account_permissions.contains(setter_id) || tags_[tag_id].account_permissions.contains(target_id)) return false;
-            // checks if setter has modification permissions or is fully connected
-            if (tags_[tag_id].account_permissions[setter_id].fully_connected || tags_[tag_id].account_permissions[setter_id].permissions & FLAG_INVITER) {
+            // checks if setter is connected to the target and has modification permissions or is fully connected
+            if (adjacent_accounts_[setter_id].contains(target_id) && (tags_[tag_id].account_permissions[setter_id].fully_connected || tags_[tag_id].account_permissions[setter_id].permissions & FLAG_INVITER)) {
                 // sets the account's permissions to default
                 tags_[tag_id].account_permissions[target_id].permissions = FLAG_DEFAULT;
                 // inserts id into tags the account is in
@@ -98,7 +98,7 @@ namespace logana {
         }
 
         // setter account removes target account from the tag
-        bool remove_member(uint32_t tag_id, uint32_t setter_id, uint32_t target_id) {
+        bool remove_member(TagId tag_id, AccountId setter_id, AccountId target_id) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // checks if tag, setter, exist and target doesn't
@@ -116,14 +116,14 @@ namespace logana {
         }
 
         // adds a connection between two accounts
-        void add_connection(uint32_t account_id_1, uint32_t account_id_2) {
+        void add_connection(AccountId account_id_1, AccountId account_id_2) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // updates the adjacency lists
             adjacent_accounts_[account_id_1].insert(account_id_2);
             adjacent_accounts_[account_id_2].insert(account_id_1);
             // loops through all tags that the first account is in
-            for (uint32_t tag_id : tags_of_account_[account_id_1]) {
+            for (TagId tag_id : tags_of_account_[account_id_1]) {
                 // if the second account is also in it recompute connectivity
                 if (tags_of_account_[account_id_2].contains(tag_id)) {
                     recompute_connectivity(tag_id);
@@ -132,14 +132,14 @@ namespace logana {
         }
 
         // removes a connection between two accounts
-        void remove_connection(uint32_t account_id_1, uint32_t account_id_2) {
+        void remove_connection(AccountId account_id_1, AccountId account_id_2) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // updates the adjacency lists
             adjacent_accounts_[account_id_1].erase(account_id_2);
             adjacent_accounts_[account_id_2].erase(account_id_1);
             // loops through all tags that the first account is in
-            for (uint32_t tag_id : tags_of_account_[account_id_1]) {
+            for (TagId tag_id : tags_of_account_[account_id_1]) {
                 // if the second account is also in it recompute connectivity
                 if (tags_of_account_[account_id_2].contains(tag_id)) {
                     recompute_connectivity(tag_id);
@@ -148,7 +148,7 @@ namespace logana {
         }
 
         // setter account sets the permissions of target account in a tag
-        void set_permissions(uint32_t tag_id, uint32_t setter_id, uint32_t target_id, uint8_t permissions) {
+        void set_permissions(TagId tag_id, AccountId setter_id, AccountId target_id, uint8_t permissions) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // checks if tag, setter, target exist
@@ -161,7 +161,7 @@ namespace logana {
         }
 
         // checks if an account has write permissions in a tag
-        bool can_write(uint32_t tag_id, uint32_t account_id) {
+        bool can_write(TagId tag_id, AccountId account_id) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // checks if tag and account exist
@@ -171,7 +171,7 @@ namespace logana {
         }
 
         // returns a set of all the accounts in the tag
-        std::unordered_set<uint32_t> get_members(uint32_t tag_id) {
+        std::unordered_set<AccountId> get_members(TagId tag_id) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             std::unordered_set<uint32_t> to_return;
@@ -183,7 +183,7 @@ namespace logana {
         }
 
         // transfers creator of tag from old to new
-        bool transfer_ownership(uint32_t tag_id, uint32_t old_id, uint32_t new_id) {
+        bool transfer_ownership(TagId tag_id, AccountId old_id, AccountId new_id) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // checks if tag exists, old_id is creator, new_id is in the tag

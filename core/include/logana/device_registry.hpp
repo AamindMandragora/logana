@@ -11,13 +11,13 @@ namespace logana {
     // struct holding the state of a device
     struct DeviceState {
         // the unique id of the device
-        uint32_t device_id;
+        DeviceId device_id;
         // the unique id of the account that owns the device
-        uint32_t account_id;
+        AccountId account_id;
         // the file descriptor the device is connected to (-1 if disconnected)
-        int64_t connection;
+        Connection connection;
         // map of sender id to last-read sequence number
-        std::unordered_map<uint32_t, uint64_t> read_sequences;
+        std::unordered_map<AccountId, Sequence> read_sequences;
 
         // a function that returns if the device is online
         bool is_online() const {
@@ -28,23 +28,23 @@ namespace logana {
     // struct holding account info
     struct AccountEntry {
         // the unique id of the account
-        uint32_t account_id;
+        AccountId account_id;
         // vector of device ids owned by the account
-        std::vector<uint32_t> device_ids;
+        std::vector<DeviceId> device_ids;
     };
 
     // class holding all the info about accounts and devices
     class DeviceRegistry {
         std::mutex mutex_;
         // map of unique ids to existing devices
-        std::unordered_map<uint32_t, DeviceState> devices_;
+        std::unordered_map<DeviceId, DeviceState> devices_;
         // map of unique ids to existing accounts
-        std::unordered_map<uint32_t, AccountEntry> accounts_;
+        std::unordered_map<AccountId, AccountEntry> accounts_;
         // the id that the next created device will be assigned
         uint32_t next_device_id_ = 1;
     public:
         // registers a device under the given account
-        uint32_t register_device(uint32_t account_id) {
+        uint32_t register_device(AccountId account_id) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // gets account from id parameter
@@ -63,7 +63,7 @@ namespace logana {
         }
 
         // takes in device id and file descriptor, changes connectivity status to file descriptor
-        bool connect_device(uint32_t device_id, int64_t connection) {
+        bool connect_device(DeviceId device_id, Connection connection) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // returns if the device was found
@@ -73,7 +73,7 @@ namespace logana {
         }
 
         // takes in device, changes connectivity status to disconnected
-        bool disconnect_device(uint32_t device_id) {
+        bool disconnect_device(DeviceId device_id) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // returns if the device was found
@@ -83,7 +83,7 @@ namespace logana {
         }
 
         // gets the device associated with the device id
-        DeviceState *get_device(uint32_t device_id) {
+        DeviceState *get_device(DeviceId device_id) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // if device doesn't exist return nullptr
@@ -92,16 +92,16 @@ namespace logana {
         }
 
         // returns a vector of devices owned by the account associated with id parameter
-        std::vector<uint32_t> get_account_devices(uint32_t account_id) {
+        std::vector<DeviceId> get_account_devices(AccountId account_id) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // if account doesn't exist return empty vector
-            if (!accounts_.contains(account_id)) return std::vector<uint32_t>();
+            if (!accounts_.contains(account_id)) return std::vector<DeviceId>();
             return accounts_[account_id].device_ids;
         }
 
         // updates the last read sequence of a sender in a device
-        void update_sequence(uint32_t device_id, uint32_t sender_id, uint64_t sequence) {
+        void update_sequence(DeviceId device_id, AccountId sender_id, Sequence sequence) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             if (devices_.contains(device_id)) {
@@ -110,8 +110,8 @@ namespace logana {
         }
 
         // gets the oldest sequence from a sender across all devices
-        uint64_t get_oldest_sequence(uint32_t sender_id) {
-            uint64_t oldest = UINT64_MAX;
+        Sequence get_oldest_sequence(AccountId sender_id) {
+            Sequence oldest = UINT64_MAX;
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             // loops through all devices
@@ -128,13 +128,13 @@ namespace logana {
         // templating for faster function
         template <typename F>
         // calls callback on each device owned by the account except for maybe a skipped one
-        void fan_out(uint32_t account_id, MessageRef ref, F&& callback, std::optional<uint32_t> skip_device_id = std::nullopt) {
+        void fan_out(AccountId account_id, MessageRef ref, F&& callback, std::optional<DeviceId> skip_device_id = std::nullopt) {
             // locks mutex
             std::lock_guard<std::mutex> lock(mutex_);
             if (!accounts_.contains(account_id)) return;
             AccountEntry& account = accounts_[account_id];
             // loop through all devices in the account
-            for (uint32_t device_id : account.device_ids) {
+            for (DeviceId device_id : account.device_ids) {
                 // if this device should be skipped continue
                 if (skip_device_id.has_value() && device_id == skip_device_id.value()) continue;
                 // if the device is online callback on the device's file descriptor and the message reference

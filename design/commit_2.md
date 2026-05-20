@@ -68,7 +68,7 @@ When a tag is created, the creator gets all four flags. When a new member is add
 
 ### Who Can Do What
 
-Adding a member: the setter must be fully connected or have `FLAG_INVITER`. The target must not already be in the tag.
+Adding a member: the setter must be fully connected or have `FLAG_INVITER`. The target must not already be in the tag and must be connected to the setter.
 
 Removing a member: if setter and target are the same person, it's a self-leave — always allowed unless they're the creator (creator must transfer ownership first). Otherwise, the setter must be fully connected or have `FLAG_KICKER`. The target cannot be the creator.
 

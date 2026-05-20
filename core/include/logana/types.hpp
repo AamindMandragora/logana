@@ -7,6 +7,13 @@
 #include <type_traits>
 
 namespace logana {
+    using AccountId = uint32_t;
+    using DeviceId = uint32_t;
+    using TagId = uint32_t;
+    using Sequence = uint64_t;
+    using Timestamp = uint64_t;
+    using Connection = int;
+
     // the default flag
     constexpr uint8_t FLAG_NONE = 0;
     // for tombstone messages
@@ -29,13 +36,13 @@ namespace logana {
 
     struct alignas(64) MessageHeader {
         // the index of the message in the deque
-        uint64_t sequence;
+        Sequence sequence;
         // unix millisecond timestamp
-        uint64_t timestamp;
+        Timestamp timestamp;
         // the userid of sender
-        uint32_t sender_id;
+        AccountId sender_id;
         // the tag being sent to
-        uint32_t tag_id;
+        TagId tag_id;
         // how many bytes is the payload
         uint32_t payload_size;
         // tells receiver how to interpret payload
@@ -51,13 +58,13 @@ namespace logana {
 
     struct MessageRef {
         // the index of the message in the deque
-        uint64_t sequence;
+        Sequence sequence;
         // unix millisecond timestamp
-        uint64_t timestamp;
+        Timestamp timestamp;
         // the userid of sender
-        uint32_t sender_id;
+        AccountId sender_id;
         // the tag being sent to
-        uint32_t tag_id;
+        TagId tag_id;
     };
 
     static_assert(std::is_trivially_copyable_v<MessageRef>);
