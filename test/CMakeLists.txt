@@ -48,3 +48,37 @@ elseif(SANITIZER STREQUAL "ubsan")
 endif()
 
 add_test(NAME TagRegistryTests COMMAND test_tag_registry)
+
+add_executable(test_message_store test_message_store.cpp)
+
+target_link_libraries(test_message_store PRIVATE logana_core)
+
+if(SANITIZER STREQUAL "asan")
+    target_compile_options(test_message_store PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(test_message_store PRIVATE -fsanitize=address)
+elseif(SANITIZER STREQUAL "tsan")
+    target_compile_options(test_message_store PRIVATE -fsanitize=thread)
+    target_link_options(test_message_store PRIVATE -fsanitize=thread)
+elseif(SANITIZER STREQUAL "ubsan")
+    target_compile_options(test_message_store PRIVATE -fsanitize=undefined)
+    target_link_options(test_message_store PRIVATE -fsanitize=undefined)
+endif()
+
+add_test(NAME MessageStoreTests COMMAND test_message_store)
+
+add_executable(test_relay_router test_relay_router.cpp)
+
+target_link_libraries(test_relay_router PRIVATE logana_core)
+
+if(SANITIZER STREQUAL "asan")
+    target_compile_options(test_relay_router PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(test_relay_router PRIVATE -fsanitize=address)
+elseif(SANITIZER STREQUAL "tsan")
+    target_compile_options(test_relay_router PRIVATE -fsanitize=thread)
+    target_link_options(test_relay_router PRIVATE -fsanitize=thread)
+elseif(SANITIZER STREQUAL "ubsan")
+    target_compile_options(test_relay_router PRIVATE -fsanitize=undefined)
+    target_link_options(test_relay_router PRIVATE -fsanitize=undefined)
+endif()
+
+add_test(NAME RelayRouterTests COMMAND test_relay_router)

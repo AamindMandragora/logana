@@ -2,6 +2,8 @@
 
 // gives us the fixed-width unsigned int types
 #include <cstdint>
+// gives us memcpy
+#include <cstring>
 
 // lets us assert that the raw bytes of message headers and refs can be copied with memcpy to get a valid object
 #include <type_traits>
@@ -101,6 +103,17 @@ namespace logana {
                 other.payload = nullptr;
             }
             return *this;
+        }
+
+        // returns a deep copy of this message
+        Message clone() {
+            Message other;
+            other.header = header;
+            if (payload && header.payload_size > 0) {
+                other.payload = new uint8_t[header.payload_size];
+                std::memcpy(other.payload, payload, header.payload_size);
+            }
+            return other;
         }
 
         // check if the message is a tombstone
