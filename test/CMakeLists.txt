@@ -81,4 +81,55 @@ elseif(SANITIZER STREQUAL "ubsan")
     target_link_options(test_relay_router PRIVATE -fsanitize=undefined)
 endif()
 
-add_test(NAME RelayRouterTests COMMAND test_relay_router)
+add_test(NAME FrameTests COMMAND test_frame)
+
+add_executable(test_frame test_frame.cpp)
+
+target_link_libraries(test_frame PRIVATE logana_core)
+
+if(SANITIZER STREQUAL "asan")
+    target_compile_options(test_frame PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(test_frame PRIVATE -fsanitize=address)
+elseif(SANITIZER STREQUAL "tsan")
+    target_compile_options(test_frame PRIVATE -fsanitize=thread)
+    target_link_options(test_frame PRIVATE -fsanitize=thread)
+elseif(SANITIZER STREQUAL "ubsan")
+    target_compile_options(test_frame PRIVATE -fsanitize=undefined)
+    target_link_options(test_frame PRIVATE -fsanitize=undefined)
+endif()
+
+add_test(NAME CryptoTests COMMAND test_crypto)
+
+add_executable(test_crypto test_crypto.cpp)
+
+target_link_libraries(test_crypto PRIVATE logana_core sodium)
+
+if(SANITIZER STREQUAL "asan")
+    target_compile_options(test_crypto PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(test_crypto PRIVATE -fsanitize=address)
+elseif(SANITIZER STREQUAL "tsan")
+    target_compile_options(test_crypto PRIVATE -fsanitize=thread)
+    target_link_options(test_crypto PRIVATE -fsanitize=thread)
+elseif(SANITIZER STREQUAL "ubsan")
+    target_compile_options(test_crypto PRIVATE -fsanitize=undefined)
+    target_link_options(test_crypto PRIVATE -fsanitize=undefined)
+endif()
+
+add_test(NAME ServerTests COMMAND test_crypto)
+
+add_executable(test_server test_server.cpp)
+
+target_link_libraries(test_server PRIVATE logana_core uring sodium)
+
+if(SANITIZER STREQUAL "asan")
+    target_compile_options(test_server PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+    target_link_options(test_server PRIVATE -fsanitize=address)
+elseif(SANITIZER STREQUAL "tsan")
+    target_compile_options(test_server PRIVATE -fsanitize=thread)
+    target_link_options(test_server PRIVATE -fsanitize=thread)
+elseif(SANITIZER STREQUAL "ubsan")
+    target_compile_options(test_server PRIVATE -fsanitize=undefined)
+    target_link_options(test_server PRIVATE -fsanitize=undefined)
+endif()
+
+add_test(NAME RelayRouterTests COMMAND test_server)

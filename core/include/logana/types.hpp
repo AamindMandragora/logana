@@ -58,6 +58,7 @@ namespace logana {
     static_assert(sizeof(MessageHeader) == 64);
     static_assert(std::is_trivially_copyable_v<MessageHeader>);
 
+    #pragma pack(push, 1)
     struct MessageRef {
         // the index of the message in the deque
         Sequence sequence;
@@ -68,7 +69,9 @@ namespace logana {
         // the tag being sent to
         TagId tag_id;
     };
+    #pragma pack(pop)
 
+    static_assert(sizeof(MessageRef) == 24);
     static_assert(std::is_trivially_copyable_v<MessageRef>);
 
     struct Message {
